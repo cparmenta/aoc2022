@@ -1,10 +1,10 @@
 import numpy as np
 
 FILENAME = 'example'
-EMPTY = '.' # ' '
-ROCK = '#' # '█'
-SAND = 'o' #'▒'
-START = '⌧'
+EMPTY = '.'
+ROCK = '#'
+SAND = 'o'
+START = '+'
 
 START_POINT = (500, 0)
 
@@ -88,16 +88,12 @@ def find_fall_point(cave, start):
         if cave[i_row, i_col] in (SAND, ROCK):
             if i_col > 0 and cave[i_row, i_col-1] == EMPTY:
                 i_col -= 1
-                #i_row -= 1
                 continue
-                #return (i_row, i_col)
             elif i_col == 0:
                 return (i_row, i_col - 1)
             elif i_col < cave.shape[1] - 1 and cave[i_row, i_col+1] == EMPTY:
-                #i_row -= 1
                 i_col += 1
                 continue
-                #return (i_row, i_col)
             elif i_col == cave.shape[1] - 1:
                 return (i_row, i_col + 1)
             else:
