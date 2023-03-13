@@ -11,7 +11,6 @@ ly, otherwise we solve the sub-problem and add its solution to the table.
 from dataclasses import dataclass
 from itertools import combinations
 from math import factorial
-from concurrent.futures import ProcessPoolExecutor, wait
 
 
 def opened2str(opened):
@@ -156,16 +155,10 @@ class Graph:
 
                 self.subpaths_done = [{}, {}]
 
-                # my_release = self.explore_simplified_recursive(start_node=start_node, minutes_left=minutes_left, nodes=list(my_combination), id=0)
-                # elephant_release = self.explore_simplified_recursive(start_node=start_node, minutes_left=minutes_left, nodes=list(elephant_combination), id=1)
+                my_release = self.explore_simplified_recursive(start_node=start_node, minutes_left=minutes_left, nodes=list(my_combination), id=0)
+                elephant_release = self.explore_simplified_recursive(start_node=start_node, minutes_left=minutes_left, nodes=list(elephant_combination), id=1)
 
-                with ProcessPoolExecutor() as executor:
-                    my_release = executor.submit(self.explore_simplified_recursive, start_node=start_node, minutes_left=minutes_left, nodes=list(my_combination), id=0)
-                    elephant_release = executor.submit(self.explore_simplified_recursive, start_node=start_node, minutes_left=minutes_left, nodes=list(elephant_combination), id=1)
-
-                wait((my_release, elephant_release))
-
-                total_release = my_release.result() + elephant_release.result()
+                total_release = my_release + elephant_release
                 if total_release > best_release: best_release = total_release
 
         return best_release
