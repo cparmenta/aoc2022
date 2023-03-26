@@ -1,8 +1,13 @@
 import numpy as np
+from scipy.signal import find_peaks
+from matplotlib import pyplot as plt
 # I just felt like doing it with Numpy ¯\(ツ)/¯
 
 FILENAME = 'input'
 
+SIMULATED_ROCKS = 25_000
+MAX_ROCKS = 1_000_000_000_000
+PEAK_THRES = 1e-3
 
 class Cave:
     def __init__(self, jet_pattern):
@@ -16,6 +21,7 @@ class Cave:
         self.jet_pattern = jet_pattern
         self.chamber = np.full((4, 7), 0, dtype=int)
         self.saved_height = 0
+        self.height_history = None
 
     def print_chamber(self):
         cave_chars = {
@@ -40,6 +46,8 @@ class Cave:
         stopped_rocks = 0
         falling = False
         process_jet = True
+
+        self.height_history = np.zeros((max_rocks,))
 
         while stopped_rocks < max_rocks:
             if not falling:
@@ -112,14 +120,14 @@ class Cave:
                     else:
                         self.chamber[I,J] = 1
                         falling = False
+                        self.height_history[stopped_rocks] = self.chamber.shape[0] - self.get_highest_y() + self.saved_height
+
                         stopped_rocks += 1
+
                         if (stopped_rocks % 1000) == 0: print(f'{stopped_rocks = }')
-                        # while self.check_lastline_blocked():
-                        #     self.print_chamber()
-                        #     print(f'Last line blocked. {stopped_rocks=}; {self.saved_height=} ')
-                        #     exit(1)
-                        #     self.chamber = np.delete(self.chamber, self.chamber.shape[0]-1, axis=0)
-                        #     self.saved_height += 1
+                        while self.check_lastline_blocked():
+                            self.chamber = np.delete(self.chamber, self.chamber.shape[0]-1, axis=0)
+                            self.saved_height += 1
                         # print(f'\nSTEP = {i_step}:')
                         # self.print_chamber()
                     process_jet = True
@@ -152,8 +160,73 @@ with open(FILENAME) as file:
 
 cave = Cave(jet_pattern)
 cave.print_chamber()
-cave.simulate(1_000_000_000_000)
+cave.simulate(SIMULATED_ROCKS)
 cave.print_chamber()
 
 height = cave.chamber.shape[0] - cave.get_highest_y() + cave.saved_height
 print(f'The tower is {height} units tall.')
+
+# A pattern can be seen here - when does it start?
+# plt.figure()
+# plt.stem(np.arange(1,cave.height_history.size+1),cave.height_history)
+# plt.ylabel('Height')
+# plt.xlabel('Rocks')
+
+height_increment = np.diff(cave.height_history)
+
+# Now, here it is obvious. I need to detect the transient and the period.
+# plt.figure()
+# plt.stem(np.arange(1,cave.height_history.size), height_increment)
+# plt.ylabel('Height increment')
+# plt.xlabel('Rocks')
+
+height_increment_ft = np.fft.fft(height_increment)/height_increment.size
+height_increment_ft_mag = np.abs(height_increment_ft)
+peak_positions, properties = find_peaks(height_increment_ft_mag, height=PEAK_THRES)
+freq_axis = np.arange(0,height_increment.size)*2*np.pi/height_increment.size
+print('DEBUG')
+print(height_increment.size, height_increment_ft.size, freq_axis.size)
+
+# For a sufficiently long simulation, this is approx. the Fourier Series of the
+# signal. The spacing gives the frequency/period.
+plt.figure()
+plt.plot(freq_axis, height_increment_ft_mag)
+plt.plot(freq_axis[peak_positions], height_increment_ft_mag[peak_positions], 'o')
+plt.ylabel('DFT[Height increment]')
+plt.xlabel('Discrete frequency')
+
+df = np.diff(freq_axis[peak_positions])
+N_array = 2*np.pi/df
+plt.figure()
+plt.plot(N_array, 'o')
+plt.show()
+N_array_ = np.delete(N_array, N_array < 1_000)
+N_= np.rint(np.mean(N_array))
+N = 1740 # It's between 1739 and 1742 - rounding errors prevent me from calculating the good one
+print(f'Freq. spacing = {df}')
+print(f'Period = {N}')
+
+# Now, look for the transient
+shift = 0
+while shift < height_increment.size - N:
+    if np.all(height_increment[shift:shift+N] == height_increment[shift+N:shift+2*N]):
+        break
+    shift += 1
+
+print(f'Transient length = {shift}')
+
+# And finally, the solution to the challenge:
+rocks_in_pattern = MAX_ROCKS - shift
+num_periods = rocks_in_pattern // N
+remainder = rocks_in_pattern % N
+
+height_transient = np.sum(height_increment[0:shift])
+height_period = np.sum(height_increment[shift:shift+N])
+height_remainder = np.sum(height_increment[shift:shift+remainder])
+
+print(f'{height_transient = }')
+print(f'{height_period = }')
+print(f'{height_remainder = }')
+
+solution = height_transient + num_periods*height_period + height_remainder
+print(f'Solution = {int(solution)}')
